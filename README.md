@@ -29,7 +29,8 @@ homelab/
 
 | Service | Type | Host | Purpose |
 |---------|------|------|---------|
-| Pi-Hole | LXC | `pve-01` | DNS / ad blocking |
+| Pi-Hole + Ubound| LXC | `pve-01` | Primary DNS / ad blocking |
+| Pi-Hole + Ubound| LXC | `pve-02` | Seconday DNS / ad blocking |
 | Zoraxy | LXC | `pve-01` | Reverse proxy |
 | Homepage | LXC | `pve-01` | Homelab dashboard |
 | RustDesk Server | LXC | `pve-01` | Self-hosted remote desktop |
