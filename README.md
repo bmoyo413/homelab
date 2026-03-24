@@ -43,7 +43,7 @@ homelab/
 | Mousehole | Docker | `pve-02` | Proxy sidecar for qBittorrent |
 | Cross-seed | Docker | `pve-02` | Automated cross-seeding |
 | Audiobookshelf | Docker | `pve-02` | Audiobook & podcast server |
-| Nebula-Sync | Docker | `pve-02` | Pi-hole multi-instance sync |
+| Nebula-Sync | Docker | `pve-02` | Pi-hole config sync between instances |
 
 > LXCs are provisioned using [Proxmox Helper Scripts](https://community-scripts.org/).
 
