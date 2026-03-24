@@ -23,7 +23,7 @@ Personal homelab running on two Proxmox hosts. Services run across Docker contai
 ## 🗂️ Repo Structure
 ```
 homelab/
-├── docker/       # Docker Compose stack + .env.example
+├── DNS/       # Dns config
 └── docs/         # Network diagrams, notes
 ```
 
@@ -33,7 +33,7 @@ homelab/
 
 | Service | Type | Host | Purpose |
 |---------|------|------|---------|
-| AdGuard Home | LXC | `pve-01` | DNS / ad blocking |
+| Pi-Hole | LXC | `pve-01` | DNS / ad blocking |
 | Zoraxy | LXC | `pve-01` | Reverse proxy |
 | Homepage | LXC | `pve-01` | Homelab dashboard |
 | RustDesk Server | LXC | `pve-01` | Self-hosted remote desktop |
@@ -46,6 +46,7 @@ homelab/
 | Mousehole | Docker | `pve-02` | Proxy sidecar for qBittorrent |
 | Cross-seed | Docker | `pve-02` | Automated cross-seeding |
 | Audiobookshelf | Docker | `pve-02` | Audiobook & podcast server |
+| Nebula-Sync | Docker | `pve-02` | Pi-hole multi-instance sync |
 
 > LXCs are provisioned using [Proxmox Helper Scripts](https://community-scripts.org/).
 
