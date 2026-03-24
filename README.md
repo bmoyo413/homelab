@@ -23,7 +23,7 @@ Personal homelab running on two Proxmox hosts. Services run across Docker contai
 ## 🗂️ Repo Structure
 ```
 homelab/
-├── DNS/       # Dns config
+├── DNS/          # Dns config
 └── docs/         # Network diagrams, notes
 ```
 
