@@ -2,7 +2,7 @@
 
 ## What This Is
 
-Two Pi-hole instances running as **DNS-only servers** for the home network. One on `pve-01`, one on `pve-02` for redundancy. This setup is purely for DNS and ad blocking DHCP is handled by the router, not Pi-hole.
+Two Pi-hole instances running as **DNS-servers** for my home network. One on `pve-01`, one on `pve-02` for redundancy. This setup is purely for DNS and ad blocking DHCP is handled by the router, not Pi-hole.
 
 Unbound runs alongside each Pi-hole instance as a recursive DNS resolver, meaning queries go directly to root DNS servers with no third-party upstream (Cloudflare, Google, etc.) ever seeing your traffic.
 
