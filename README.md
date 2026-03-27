@@ -20,7 +20,7 @@ Personal homelab running on two Proxmox hosts. Services run across Docker contai
 ```
 homelab/
 ├── DNS/          # Dns config
-└── docs/         # Network diagrams, notes
+└── DOCKER        # Docker Compose stack 
 ```
 
 ---
