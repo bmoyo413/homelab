@@ -20,7 +20,8 @@ Personal homelab running on two Proxmox hosts. Services run across Docker contai
 ```
 homelab/
 ├── DNS/          # Dns config
-└── DOCKER        # Docker Compose stack 
+├── ansible       # Automation
+└── docker        # Docker Compose stack 
 ```
 
 ---
@@ -34,6 +35,7 @@ homelab/
 | Zoraxy | LXC | `pve-01` | Reverse proxy |
 | Homepage | LXC | `pve-01` | Homelab dashboard |
 | RustDesk Server | LXC | `pve-01` | Self-hosted remote desktop |
+| Ansible / Semaphore | LXC | `pve-01` | Automation & playbook management UI |
 | Jellyfin | VM (GPU passthrough) | `pve-02` | Media server |
 | qBittorrent | Docker | `pve-02` | Download client (ProtonVPN via WireGuard) |
 | Radarr | Docker | `pve-02` | Movie management |
@@ -44,6 +46,12 @@ homelab/
 | Cross-seed | Docker | `pve-02` | Automated cross-seeding |
 | Audiobookshelf | Docker | `pve-02` | Audiobook & podcast server |
 | Nebula-Sync | Docker | `pve-02` | Pi-hole config sync between instances |
+| Prometheus | LXC | `pve-02` | Metrics collection |
+| Grafana | LXC | `pve-02` | Metrics dashboards & visualization |
+| Loki | LXC | `pve-02` | Log aggregation |
+| Gitea | LXC | `pve-02` | Self-hosted Git server |
+| Vaultwarden | LXC | `pve-02` | Self-hosted password manager (Bitwarden compatible) |
+
 
 > LXCs are provisioned using [Proxmox Helper Scripts](https://community-scripts.org/).
 
