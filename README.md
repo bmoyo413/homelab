@@ -12,7 +12,7 @@ Personal homelab running on two Proxmox hosts. Services run across Docker contai
 | Host | CPU | GPU | RAM | Storage |
 |------|-----|-----|-----|---------|
 | `pve-01` | Ryzen 5 2600X | RX 580 | 32GB DDR4 | 4TB Mirror (2x 4TB) |
-| `pve-02` | Ryzen 5 2600 | GTX 1660 (passthrough) | 24GB | ZFS RAIDZ2 (6x 1TB) + 3x 256GB SSD Stripe |
+| `pve-02` | Ryzen 5 2600 | GTX 1660 (passthrough) | 24GB  DDR4 | ZFS RAIDZ2 (6x 1TB) + 3x 256GB SSD Stripe |
 
 ---
 
