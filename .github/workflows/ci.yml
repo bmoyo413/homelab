@@ -1,0 +1,28 @@
+name: CI
+
+# Runs on pushes to main, on every PR, and whenever I kick it off by hand.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  compose-validate:
+    name: Validate Docker Compose
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4   # grab the repo
+
+      # The whole point: catch a broken Compose file before it ever hits a host.
+      # Compose fills in ${VARS} from .env, and each stack's .env.example already
+      # lists every key it needs, so copying the template to .env is enough to
+      # validate the file without any real secrets lying around.
+      - name: Validate each Compose stack
+        run: |
+          for compose in docker/*/docker-compose.yml; do
+            dir="$(dirname "$compose")"
+            echo "Validating $compose"
+            cp "$dir/.env.example" "$dir/.env"   # fake .env from the template
+            docker compose -f "$compose" config --quiet   # parse it, fail loudly if it's bad
+          done
