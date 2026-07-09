@@ -1,0 +1,270 @@
+# Secrets and host-specific values live in ./.env (gitignored). Copy .env.example
+# to .env and fill it in before deploying:  docker compose up -d
+#
+# qBittorrent routes all traffic through ProtonVPN (WireGuard). Its wg0.conf lives
+# in the qbittorrent /config volume and is never committed to git.
+
+services:
+  qbittorrent:
+    container_name: qbittorrent
+    hostname: qbittorrent.internal
+    security_opt:
+      - no-new-privileges:true
+    image: ghcr.io/hotio/qbittorrent:release-5.1.4
+    restart: unless-stopped
+    ports:
+      - 8080:8080
+      - 5010:5010
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - UMASK=002
+      - TZ=${TZ}
+      - WEBUI_PORTS=8080/tcp
+      - VPN_EXPOSE_PORTS_ON_LAN=5010/tcp
+      - LIBTORRENT=v1
+      - VPN_ENABLED=true
+      - VPN_CONF=wg0
+      - VPN_PROVIDER=proton
+      - VPN_LAN_NETWORK=${VPN_LAN_NETWORK}
+      - VPN_LAN_LEAK_ENABLED=false
+      - VPN_AUTO_PORT_FORWARD=true
+      - VPN_HEALTHCHECK_ENABLED=false
+      - PRIVOXY_ENABLED=false
+      - UNBOUND_ENABLED=false
+    volumes:
+      - /docker/appdata/qbittorrent:/config
+      - /mnt/data:/mnt/data
+    cap_add:
+      - NET_ADMIN
+    sysctls:
+      - net.ipv4.conf.all.src_valid_mark=1
+      - net.ipv6.conf.all.disable_ipv6=1
+    healthcheck:
+      # WebUI binds inside the container regardless of VPN state. hotio images ship curl.
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  radarr:
+    container_name: radarr
+    hostname: radarr.internal
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    image: ghcr.io/hotio/radarr:release 
+    ports:
+      - 7878:7878
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - UMASK=002
+      - TZ=${TZ}
+      - WEBUI_PORTS=7878/tcp
+    volumes:
+      - /docker/appdata/radarr:/config
+      - /mnt/data:/mnt/data
+    depends_on:
+      qbittorrent:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:7878/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  sonarr:
+    container_name: sonarr
+    hostname: sonarr.internal
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    image: ghcr.io/hotio/sonarr:release 
+    ports:
+      - 8989:8989
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - UMASK=002
+      - TZ=${TZ}
+      - WEBUI_PORTS=8989/tcp
+    volumes:
+      - /docker/appdata/sonarr:/config
+      - /mnt/data:/mnt/data
+    depends_on:
+      qbittorrent:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8989/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  prowlarr:
+    container_name: prowlarr
+    hostname: prowlarr.internal
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    image: ghcr.io/hotio/prowlarr:release 
+    ports:
+      - 9696:9696
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - UMASK=002
+      - TZ=${TZ}
+      - WEBUI_PORTS=9696/tcp
+    volumes:
+      - /docker/appdata/prowlarr:/config
+    depends_on:
+      qbittorrent:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:9696/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  flaresolverr:
+    container_name: flaresolverr
+    hostname: flaresolverr.internal
+    security_opt:
+      - no-new-privileges:true
+    image: ghcr.io/flaresolverr/flaresolverr:v3.5.0
+    restart: unless-stopped
+    ports:
+      - 8191:8191
+    environment:
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - LOG_HTML=${LOG_HTML:-false}
+      - CAPTCHA_SOLVER=${CAPTCHA_SOLVER:-none}
+      - TZ=${TZ}
+
+  profilarr:
+    container_name: profilarr
+    image: santiagosayshey/profilarr:v1.1.4 
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    ports:
+      - 6868:6868
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - UMASK=022
+      - TZ=${TZ}
+    volumes:
+      - /docker/appdata/profilarr:/config
+
+  mousehole:
+    container_name: mousehole
+    image: tmmrtn/mousehole:0.4.0
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    network_mode: service:qbittorrent
+    environment:
+      - TZ=${TZ}
+      # v0.4.0+ requires auth. UI is LAN-reachable via qBittorrent's exposed :5010.
+      - MOUSEHOLE_AUTH_PASSWORD=${MOUSEHOLE_AUTH_PASSWORD}
+      # v0.4.0 Host-header allowlist (DNS-rebinding guard); defaults to localhost only,
+      # so the LAN IP/hostname you browse to must be listed here. Set in .env.
+      - MOUSEHOLE_ALLOWED_HOSTS=${MOUSEHOLE_ALLOWED_HOSTS}
+    volumes:
+      - /docker/appdata/mousehole:/var/lib/mousehole   # v0.4.0 default state dir (was /srv/mousehole)
+    depends_on:
+      qbittorrent:
+        condition: service_started
+
+  audiobookshelf: 
+    container_name: audiobookshelf
+    hostname: audiobookshelf.internal
+    security_opt:
+      - no-new-privileges:true
+    image: ghcr.io/advplyr/audiobookshelf:2.35.1
+    restart: unless-stopped
+    ports:
+      - 13378:80
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - /docker/appdata/audiobookshelf:/config
+      - /docker/appdata/audiobookshelf/metadata:/metadata
+      - /mnt/data/torrents/books:/books
+
+  cross-seed:
+    container_name: cross-seed
+    image: ghcr.io/cross-seed/cross-seed:6.13.5
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    user: ${PUID}:${PGID}
+    ports:
+      - 2468:2468
+    volumes:
+      - /docker/appdata/cross-seed:/config
+      - /mnt/data:/mnt/data
+    command: daemon
+    depends_on:
+      qbittorrent:
+        condition: service_started
+
+  cadvisor:
+    container_name: cadvisor
+    image: gcr.io/cadvisor/cadvisor:v0.55.1
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    devices:
+      - /dev/kmsg
+    ports:
+      - 8081:8080
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+
+  # OS metrics for THIS (media) VM. Published on :9100 because Prometheus runs remotely
+  # in the apps stack and scrapes it over the LAN. (apps runs its own node-exporter,
+  # internal-only there.)
+  node-exporter:
+    container_name: node-exporter
+    image: prom/node-exporter:v1.11.1
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    pid: host
+    command:
+      - --path.rootfs=/host
+      - --path.procfs=/host/proc
+      - --path.sysfs=/host/sys
+      - --collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)
+    ports:
+      - 9100:9100
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/host:ro,rslave
+
+  nebula-sync:
+    container_name: nebula-sync
+    image: ghcr.io/lovelaze/nebula-sync:v0.11.2
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    environment:
+      - PRIMARY=http://${PIHOLE_PRIMARY_IP}|${NEBULA_PRIMARY_PASS}
+      - REPLICAS=http://${PIHOLE_REPLICA_IP}|${NEBULA_REPLICA_PASS}
+      - FULL_SYNC=true
+      - RUN_GRAVITY=true
+      - CRON=0 * * * *
