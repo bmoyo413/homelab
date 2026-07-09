@@ -1,0 +1,95 @@
+# Prometheus scrape config, three layers, one job each:
+#   node-exporter → per-VM OS metrics   cadvisor → per-container   pve → hypervisor (PVE API)
+#
+# Prometheus does NOT expand ${ENV} here. The 192.168.1.x values are SANITIZED placeholders,
+# edit them to your real LAN IPs:
+#   192.168.1.20    # EDIT: <MEDSEV_IP>      media-stack VM (used twice: node-exporter :9100 + cAdvisor :8081)
+#   192.168.1.10    # EDIT: <JOKER_IP>       Proxmox node pve-01
+#   192.168.1.11    # EDIT: <PANTHEON_IP>    Proxmox node pve-02
+#   <APPS_DOMAIN>   # EDIT: <APPS_DOMAIN>    your domain, e.g. example.com (matches APPS_DOMAIN in .env)
+
+global:
+  scrape_interval: 30s
+  evaluation_interval: 30s
+
+rule_files:
+  - /etc/prometheus/rules/*.yml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["alertmanager:9093"]
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # Layer: OS / per-VM. apps = internal; media = cross-host (published :9100 there).
+  - job_name: node-exporter
+    static_configs:
+      - targets: ["node-exporter:9100"]
+        labels: { host: apps }
+      - targets: ["192.168.1.20:9100"]   # EDIT: <MEDSEV_IP>
+        labels: { host: media }
+
+  # Layer: containers. apps = internal :8080; media = cross-host (published :8081 there).
+  - job_name: cadvisor
+    static_configs:
+      - targets: ["cadvisor:8080"]
+        labels: { host: apps }
+      - targets: ["192.168.1.20:8081"]   # EDIT: <MEDSEV_IP>
+        labels: { host: media }
+
+  # Layer: hypervisor. One pve-exporter (creds in .env) queried per node via ?target=.
+  # Clustered, so one token covers both nodes; just add each node as a target.
+  - job_name: pve
+    metrics_path: /pve
+    params:
+      module: [default]
+    static_configs:
+      - targets:
+          - "192.168.1.10"               # EDIT: <JOKER_IP>     (pve-01)
+          - "192.168.1.11"               # EDIT: <PANTHEON_IP>  (pve-02)
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: pve-exporter:9221
+
+  # Layer: cert blackbox-exporter probes each routed HTTPS endpoint through Caddy
+  # replace <APPS_DOMAIN> with your real domain (matches APPS_DOMAIN in .env).
+  - job_name: blackbox-tls
+    metrics_path: /probe
+    params:
+      module: [https_2xx]
+    static_configs:
+      - targets:
+          - "https://grafana.<APPS_DOMAIN>"        # EDIT: <APPS_DOMAIN>
+          - "https://prometheus.<APPS_DOMAIN>"     # EDIT: <APPS_DOMAIN>
+          - "https://alertmanager.<APPS_DOMAIN>"   # EDIT: <APPS_DOMAIN>
+          - "https://ntfy.<APPS_DOMAIN>"           # EDIT: <APPS_DOMAIN>
+          - "https://gitea.<APPS_DOMAIN>"          # EDIT: <APPS_DOMAIN>
+          - "https://vault.<APPS_DOMAIN>"          # EDIT: <APPS_DOMAIN>
+          - "https://auth.<APPS_DOMAIN>"           # EDIT: <APPS_DOMAIN>
+          - "https://obsidian.<APPS_DOMAIN>"       # EDIT: <APPS_DOMAIN>
+          - "https://obsidian-app.<APPS_DOMAIN>"   # EDIT: <APPS_DOMAIN>
+          - "https://homepage.<APPS_DOMAIN>"       # EDIT: <APPS_DOMAIN>
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
+  # App-level: Authentik (the identity provider). Both the server and worker publish
+  # internal Prometheus metrics on :9300, scraped by name since they live in this stack.
+  - job_name: authentik
+    static_configs:
+      - targets: ["authentik-server:9300"]
+        labels: { component: server }
+      - targets: ["authentik-worker:9300"]
+        labels: { component: worker }

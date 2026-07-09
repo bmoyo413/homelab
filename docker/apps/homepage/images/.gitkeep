@@ -1,0 +1,2 @@
+# Drop a background.jpg here (referenced by settings.yaml). The wallpaper itself is
+# gitignored (host-local), this keeps the dir present so the mount + path resolve.

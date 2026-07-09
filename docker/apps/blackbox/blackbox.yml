@@ -1,0 +1,17 @@
+# blackbox-exporter modules.
+# Certs are real Let's Encrypt (Cloudflare DNS-01), so TLS is verified, a probe failure means a
+# genuinely broken/expired/misconfigured cert, not a self-signed warning. Probing reaches Caddy
+# via in-stack network aliases for each FQDN (see the caddy service); the relabel config in
+# prometheus.yml supplies the per-endpoint target.
+modules:
+  https_2xx:
+    prober: http
+    timeout: 10s
+    http:
+      method: GET
+      valid_http_versions: ["HTTP/1.1", "HTTP/2.0"]
+      valid_status_codes: [200, 204, 301, 302, 303, 307, 308, 401, 403, 404]
+      fail_if_not_ssl: true         # must be HTTPS; a plaintext answer is a failure
+      tls_config:
+        insecure_skip_verify: false # verify the chain
+      preferred_ip_protocol: ip4

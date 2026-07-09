@@ -1,0 +1,9 @@
+# Homepage, Docker integration. Points at the read-only docker-socket-proxy sidecar over
+# TCP instead of mounting the raw /var/run/docker.sock into Homepage. The proxy only exposes
+# CONTAINERS + INFO (everything else denied), so the dashboard can show per-container status
+# without holding root-equivalent socket access. Docs:
+# https://gethomepage.dev/configs/docker/
+---
+my-docker:
+  host: socket-proxy
+  port: 2375

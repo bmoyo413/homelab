@@ -1,0 +1,136 @@
+# Reverse proxy for the apps stack. Reached over Tailscale; real Let's Encrypt certs
+# via Cloudflare DNS-01 (no inbound ports). Pair with split-horizon DNS: point
+# *.{$APPS_DOMAIN} at this host in Pi-hole so traffic stays on the LAN/tailnet.
+# {$APPS_DOMAIN} / {$CF_API_TOKEN} / {$ACME_EMAIL} come from the container env.
+#
+# Add a service: copy a block and point reverse_proxy at its container name + port.
+
+{
+	email {$ACME_EMAIL}
+}
+
+# Reusable TLS block, Cloudflare DNS-01 challenge.
+(cf_tls) {
+	tls {
+		dns cloudflare {env.CF_API_TOKEN}
+		resolvers 1.1.1.1
+	}
+}
+
+grafana.{$APPS_DOMAIN} {
+	import cf_tls
+	reverse_proxy grafana:3000
+}
+
+prometheus.{$APPS_DOMAIN} {
+	import cf_tls
+	reverse_proxy prometheus:9090
+}
+
+alertmanager.{$APPS_DOMAIN} {
+	import cf_tls
+	reverse_proxy alertmanager:9093
+}
+
+ntfy.{$APPS_DOMAIN} {
+	import cf_tls
+	reverse_proxy ntfy:80
+}
+
+gitea.{$APPS_DOMAIN} {
+	import cf_tls
+	reverse_proxy gitea:3000
+}
+
+vault.{$APPS_DOMAIN} {
+	import cf_tls
+	reverse_proxy vaultwarden:80
+}
+
+auth.{$APPS_DOMAIN} {
+	import cf_tls
+	reverse_proxy authentik-server:9000
+}
+
+obsidian.{$APPS_DOMAIN} {
+	import cf_tls
+	reverse_proxy couchdb:5984
+}
+
+# Obsidian desktop in the browser (KasmVNC). Caddy upgrades WebSockets transparently, so the
+# linuxserver "strict reverse proxies" caveat (an nginx issue) does not apply here. Use the
+# plain-HTTP port 3000; Caddy terminates TLS.
+obsidian-app.{$APPS_DOMAIN} {
+	import cf_tls
+	reverse_proxy obsidian-app:3000
+}
+
+homepage.{$APPS_DOMAIN} {
+	import cf_tls
+	reverse_proxy homepage:3000
+}
+
+# --- Media stack (cross-host: runs on the media VM, not in this stack) ---
+# {$MEDIA_HOST} is the media VM's LAN/tailnet IP (set in .env, passed via compose env).
+# These give the media web UIs the same <name>.{$APPS_DOMAIN} + real-cert treatment as the
+# apps stack, so nothing is reached by bare IP:port. No /api bypass is needed while these
+# are unauthenticated; add one only if Authentik forward-auth later fronts them.
+jellyfin.{$APPS_DOMAIN} {
+	import cf_tls
+	reverse_proxy {$MEDIA_HOST}:8096
+}
+
+sonarr.{$APPS_DOMAIN} {
+	import cf_tls
+	reverse_proxy {$MEDIA_HOST}:8989
+}
+
+radarr.{$APPS_DOMAIN} {
+	import cf_tls
+	reverse_proxy {$MEDIA_HOST}:7878
+}
+
+prowlarr.{$APPS_DOMAIN} {
+	import cf_tls
+	reverse_proxy {$MEDIA_HOST}:9696
+}
+
+# qBittorrent validates the Host header, so rewrite it to the upstream host:port.
+qbittorrent.{$APPS_DOMAIN} {
+	import cf_tls
+	reverse_proxy {$MEDIA_HOST}:8080 {
+		header_up Host {upstream_hostport}
+	}
+}
+
+profilarr.{$APPS_DOMAIN} {
+	import cf_tls
+	reverse_proxy {$MEDIA_HOST}:6868
+}
+
+audiobookshelf.{$APPS_DOMAIN} {
+	import cf_tls
+	reverse_proxy {$MEDIA_HOST}:13378
+}
+
+# --- Proxmox nodes (cross-host: the hypervisors themselves) ---
+# Reuse {$PVE1_URL}/{$PVE2_URL} (the node web-UI origins already set in .env for SSO). Proxmox
+# serves a self-signed cert on :8006, so skip upstream verification; Caddy still issues a real
+# LE cert on the outside. HEAD returns 501 (pveproxy quirk); GET is 200.
+joker.{$APPS_DOMAIN} {
+	import cf_tls
+	reverse_proxy {$PVE1_URL} {
+		transport http {
+			tls_insecure_skip_verify
+		}
+	}
+}
+
+pantheon.{$APPS_DOMAIN} {
+	import cf_tls
+	reverse_proxy {$PVE2_URL} {
+		transport http {
+			tls_insecure_skip_verify
+		}
+	}
+}

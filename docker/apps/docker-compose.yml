@@ -1,0 +1,551 @@
+# Homelab apps stack, monitoring core. Runs in a dedicated VM on pantheon (pve-02);
+# appdata lives on the `dagger` pool (bind-mounted under ${APPDATA}).
+#
+# Exposure: only Caddy publishes ports. Everything else is internal-only and
+# reached through Caddy by container name, over Tailscale, with internal TLS.
+# Secrets and host-specific values live in ./.env (gitignored). Deploy from the
+# repo root:  docker compose -f docker/apps/docker-compose.yml up -d
+
+services:
+  caddy:
+    container_name: caddy
+    # Custom build = stock Caddy + the Cloudflare DNS plugin (see ./caddy/Dockerfile)
+    # for real Let's Encrypt certs via DNS-01. Pinned base tags inside the Dockerfile.
+    build: ./caddy
+    image: homelab/caddy:2.11.4-cloudflare
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    ports:
+      - 80:80
+      - 443:443
+      - 443:443/udp   # HTTP/3
+    environment:
+      - APPS_DOMAIN=${APPS_DOMAIN}
+      - CF_API_TOKEN=${CF_API_TOKEN}
+      - ACME_EMAIL=${ACME_EMAIL}
+      # Cross-host reverse-proxy targets (media VM + Proxmox nodes). PVE*_URL are reused
+      # from the SSO block below; MEDIA_HOST is the media VM IP.
+      - MEDIA_HOST=${MEDIA_HOST}
+      - PVE1_URL=${PVE1_URL}
+      - PVE2_URL=${PVE2_URL}
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ${APPDATA}/caddy/data:/data
+      - ${APPDATA}/caddy/config:/config
+    depends_on:
+      - grafana
+      - prometheus
+      - alertmanager
+      - ntfy
+      - gitea
+      - vaultwarden
+      - authentik-server
+      - couchdb
+      - homepage
+    networks:
+      default:
+        # In-stack aliases so blackbox-exporter can resolve each routed FQDN to Caddy and
+        # probe its real cert with correct SNI (split-horizon DNS only exists on Pi-hole,
+        # not the Docker network). ${APPS_DOMAIN} is interpolated from .env.
+        aliases:
+          - grafana.${APPS_DOMAIN}
+          - prometheus.${APPS_DOMAIN}
+          - alertmanager.${APPS_DOMAIN}
+          - ntfy.${APPS_DOMAIN}
+          - gitea.${APPS_DOMAIN}
+          - vault.${APPS_DOMAIN}
+          - auth.${APPS_DOMAIN}
+          - obsidian.${APPS_DOMAIN}
+          - obsidian-app.${APPS_DOMAIN}
+          - homepage.${APPS_DOMAIN}
+
+  prometheus:
+    container_name: prometheus
+    image: prom/prometheus:v3.12.0
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=30d
+      - --web.enable-lifecycle
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/rules:/etc/prometheus/rules:ro
+      - ${APPDATA}/prometheus:/prometheus
+    healthcheck:
+      # prom/prometheus is busybox-based and ships wget.
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  alertmanager:
+    container_name: alertmanager
+    image: prom/alertmanager:v0.32.2
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ${APPDATA}/alertmanager:/alertmanager
+    depends_on:
+      - ntfy-alertmanager
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9093/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+
+  ntfy-alertmanager:
+    container_name: ntfy-alertmanager
+    image: xenrox/ntfy-alertmanager:1.0.0
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    volumes:
+      - ./ntfy-alertmanager/config:/etc/ntfy-alertmanager/config:ro
+    depends_on:
+      - ntfy
+
+  grafana:
+    container_name: grafana
+    image: grafana/grafana:12.4.4
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    environment:
+      - TZ=${TZ}
+      - GF_SECURITY_ADMIN_PASSWORD=${GF_ADMIN_PASSWORD}
+      - GF_SERVER_ROOT_URL=https://grafana.${APPS_DOMAIN}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      # --- SSO via Authentik (OIDC) ---
+      # The local admin login stays available as a break-glass fallback. The matching
+      # OAuth2 provider/application is created declaratively by ./authentik/blueprints/.
+      - GF_AUTH_GENERIC_OAUTH_ENABLED=true
+      - GF_AUTH_GENERIC_OAUTH_NAME=authentik
+      - GF_AUTH_GENERIC_OAUTH_CLIENT_ID=${GF_OAUTH_CLIENT_ID}
+      - GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET=${GF_OAUTH_CLIENT_SECRET}
+      - GF_AUTH_GENERIC_OAUTH_SCOPES=openid email profile
+      - GF_AUTH_GENERIC_OAUTH_AUTH_URL=https://auth.${APPS_DOMAIN}/application/o/authorize/
+      - GF_AUTH_GENERIC_OAUTH_TOKEN_URL=https://auth.${APPS_DOMAIN}/application/o/token/
+      - GF_AUTH_GENERIC_OAUTH_API_URL=https://auth.${APPS_DOMAIN}/application/o/userinfo/
+      - GF_AUTH_GENERIC_OAUTH_USE_PKCE=true
+      # Map Authentik groups to Grafana roles; default to Viewer.
+      - GF_AUTH_GENERIC_OAUTH_ROLE_ATTRIBUTE_PATH=contains(groups[*], 'Grafana Admins') && 'Admin' || contains(groups[*], 'Grafana Editors') && 'Editor' || 'Viewer'
+      - GF_AUTH_GENERIC_OAUTH_ALLOW_ASSIGN_GRAFANA_ADMIN=true
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/etc/grafana/dashboards:ro   # dashboards as code
+      - ${APPDATA}/grafana:/var/lib/grafana   # must be writable by uid 472 (chown on the VM)
+    depends_on:
+      - prometheus
+      - loki
+
+  loki:
+    container_name: loki
+    image: grafana/loki:3.7.2
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    command:
+      - -config.file=/etc/loki/loki-config.yml
+    volumes:
+      - ./loki/loki-config.yml:/etc/loki/loki-config.yml:ro
+      - ${APPDATA}/loki:/loki   # must be writable by uid 10001 (chown on the VM)
+
+  alloy:
+    container_name: alloy
+    image: grafana/alloy:v1.16.3
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    command:
+      - run
+      - --server.http.listen-addr=0.0.0.0:12345
+      - --storage.path=/var/lib/alloy/data
+      - /etc/alloy/config.alloy
+    volumes:
+      - ./alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - ${APPDATA}/alloy:/var/lib/alloy/data
+      - /var/run/docker.sock:/var/run/docker.sock:ro   # read-only: discover + tail container logs
+    depends_on:
+      - loki
+
+  node-exporter:
+    container_name: node-exporter
+    image: prom/node-exporter:v1.11.1
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    pid: host
+    command:
+      - --path.rootfs=/host
+      - --path.procfs=/host/proc
+      - --path.sysfs=/host/sys
+      - --collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/host:ro,rslave
+
+  # Per-container metrics for THIS (apps) host. No published port, Prometheus is in
+  # this stack and scrapes it internally as cadvisor:8080. (media runs its own cAdvisor,
+  # published on :8081 there, because Prometheus reaches it cross-host.)
+  cadvisor:
+    container_name: cadvisor
+    image: gcr.io/cadvisor/cadvisor:v0.55.1
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    # Unprivileged: just /dev/kmsg + the read-only mounts below (matches the media stack).
+    devices:
+      - /dev/kmsg
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+
+  pve-exporter:
+    container_name: pve-exporter
+    image: prompve/prometheus-pve-exporter:3.9.0
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    environment:
+      # Read-only Proxmox API token (the secret values live in .env).
+      - PVE_USER=${PVE_USER}
+      - PVE_TOKEN_NAME=${PVE_TOKEN_NAME}
+      - PVE_TOKEN_VALUE=${PVE_TOKEN_VALUE}
+      - PVE_VERIFY_SSL=false
+
+  # Probes each routed HTTPS endpoint through Caddy to surface TLS cert expiry
+  # (probe_ssl_earliest_cert_expiry) and reachability. Internal-only; Prometheus scrapes it
+  # as blackbox-exporter:9115. Config in ./blackbox/blackbox.yml.
+  blackbox-exporter:
+    container_name: blackbox-exporter
+    image: prom/blackbox-exporter:v0.25.0
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/blackbox/blackbox.yml
+    volumes:
+      - ./blackbox/blackbox.yml:/etc/blackbox/blackbox.yml:ro
+    depends_on:
+      - caddy
+
+  ntfy:
+    container_name: ntfy
+    image: binwiederhier/ntfy:v2.24.0
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    command: serve
+    environment:
+      - TZ=${TZ}
+      - NTFY_BASE_URL=https://ntfy.${APPS_DOMAIN}
+      - NTFY_BEHIND_PROXY=true
+      - NTFY_CACHE_FILE=/var/cache/ntfy/cache.db
+      - NTFY_AUTH_FILE=/var/lib/ntfy/auth.db
+      # Open on the tailnet by default. To lock down: set deny-all and add users,
+      #   docker exec ntfy ntfy access '*' '<topic>' deny  /  ntfy user add <name>
+      - NTFY_AUTH_DEFAULT_ACCESS=read-write
+    volumes:
+      - ${APPDATA}/ntfy/cache:/var/cache/ntfy
+      - ${APPDATA}/ntfy/lib:/var/lib/ntfy
+    healthcheck:
+      # ntfy ships wget; /v1/health returns {"healthy":true}.
+      test: ["CMD-SHELL", "wget -q -O - http://localhost:80/v1/health | grep -Eo '\"healthy\"\\s*:\\s*true'"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+
+  gitea:
+    container_name: gitea
+    image: gitea/gitea:1.26.2
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    environment:
+      - TZ=${TZ}
+      - USER_UID=${PUID}
+      - USER_GID=${PGID}
+      - GITEA__server__DOMAIN=gitea.${APPS_DOMAIN}
+      - GITEA__server__ROOT_URL=https://gitea.${APPS_DOMAIN}/
+      # SQLite: lean, single-user homelab. Switch to Postgres (add a db service +
+      # GITEA__database__*) if you outgrow it.
+      - GITEA__database__DB_TYPE=sqlite3
+      - GITEA__service__DISABLE_REGISTRATION=true
+      # Git cloning is HTTPS-only via Caddy. To enable Git-over-SSH, publish
+      # "2222:22" below and set GITEA__server__SSH_PORT=2222 / SSH_LISTEN_PORT=22.
+    volumes:
+      - ${APPDATA}/gitea:/data
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  vaultwarden:
+    container_name: vaultwarden
+    image: vaultwarden/server:1.36.0
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    environment:
+      - TZ=${TZ}
+      - DOMAIN=https://vault.${APPS_DOMAIN}
+      - SIGNUPS_ALLOWED=false   # create your account once, keep this false
+      - ADMIN_TOKEN=${VAULTWARDEN_ADMIN_TOKEN}
+    volumes:
+      - ${APPDATA}/vaultwarden:/data
+    # No healthcheck: the vaultwarden image ships no shell/wget/curl to probe with.
+    # /alive is the endpoint to use if you add an external uptime check.
+
+  # --- Authentik: central identity provider (OIDC/SSO) ------------------------------
+  # Four containers (server + worker + Postgres + Redis), the upstream-recommended
+  # topology. Internal-only: Caddy publishes auth.${APPS_DOMAIN} → authentik-server:9000.
+  # The OAuth2 providers/applications for Grafana + Gitea are declared in
+  # ./authentik/blueprints/ (applied on boot) so the SSO config is reproducible, not click-ops.
+  authentik-postgresql:
+    container_name: authentik-postgresql
+    image: postgres:16.14-alpine
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=authentik
+      - POSTGRES_DB=authentik
+      - POSTGRES_PASSWORD=${AUTHENTIK_PG_PASS}
+    volumes:
+      - ${APPDATA}/authentik/db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U authentik -d authentik"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  authentik-redis:
+    container_name: authentik-redis
+    image: redis:7.4-alpine
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    command: --save 60 1 --loglevel warning
+    volumes:
+      - ${APPDATA}/authentik/redis:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  authentik-server:
+    container_name: authentik-server
+    image: ghcr.io/goauthentik/server:2026.5.3
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    command: server
+    environment:
+      - AUTHENTIK_SECRET_KEY=${AUTHENTIK_SECRET_KEY}
+      - AUTHENTIK_ERROR_REPORTING__ENABLED=false
+      - AUTHENTIK_POSTGRESQL__HOST=authentik-postgresql
+      - AUTHENTIK_POSTGRESQL__USER=authentik
+      - AUTHENTIK_POSTGRESQL__NAME=authentik
+      - AUTHENTIK_POSTGRESQL__PASSWORD=${AUTHENTIK_PG_PASS}
+      - AUTHENTIK_REDIS__HOST=authentik-redis
+      # First-boot admin (akadmin). Change the password after first login; safe to leave set.
+      - AUTHENTIK_BOOTSTRAP_PASSWORD=${AUTHENTIK_BOOTSTRAP_PASSWORD}
+      - AUTHENTIK_BOOTSTRAP_TOKEN=${AUTHENTIK_BOOTSTRAP_TOKEN}
+      # Consumed by the blueprints (!Env) so the OAuth2 client creds match the clients' .env.
+      - APPS_DOMAIN=${APPS_DOMAIN}
+      - GF_OAUTH_CLIENT_ID=${GF_OAUTH_CLIENT_ID}
+      - GF_OAUTH_CLIENT_SECRET=${GF_OAUTH_CLIENT_SECRET}
+      - GITEA_OAUTH_CLIENT_ID=${GITEA_OAUTH_CLIENT_ID}
+      - GITEA_OAUTH_CLIENT_SECRET=${GITEA_OAUTH_CLIENT_SECRET}
+      # Proxmox host SSO: blueprint registers each PVE node's web UI as a redirect URI.
+      - PVE_OAUTH_CLIENT_ID=${PVE_OAUTH_CLIENT_ID}
+      - PVE_OAUTH_CLIENT_SECRET=${PVE_OAUTH_CLIENT_SECRET}
+      - PVE1_URL=${PVE1_URL}
+      - PVE2_URL=${PVE2_URL}
+    volumes:
+      - ${APPDATA}/authentik/media:/media
+      - ./authentik/blueprints:/blueprints/custom:ro
+    healthcheck:
+      test: ["CMD", "ak", "healthcheck"]
+      interval: 30s
+      timeout: 30s
+      retries: 5
+      start_period: 60s
+    depends_on:
+      authentik-postgresql:
+        condition: service_healthy
+      authentik-redis:
+        condition: service_healthy
+
+  # --- CouchDB: sync backend for Obsidian Self-hosted LiveSync ----------------------
+  # Internal-only; Caddy publishes obsidian.${APPS_DOMAIN} → couchdb:5984. Uses CouchDB's
+  # own basic auth (the LiveSync plugin authenticates with it), not Authentik. Real-time,
+  # end-to-end-encrypted note sync across desktop + iOS (iPhone reaches it over Tailscale).
+  couchdb:
+    container_name: couchdb
+    image: couchdb:3.5.2
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    environment:
+      - COUCHDB_USER=${COUCHDB_USER}
+      - COUCHDB_PASSWORD=${COUCHDB_PASSWORD}
+    volumes:
+      - ${APPDATA}/couchdb/data:/opt/couchdb/data
+      # Mounted read-write so the image entrypoint can chown it. A :ro root-owned file makes
+      # the entrypoint's chown fail and abort before CouchDB logs anything (empty-log crash-loop).
+      - ./couchdb/local.ini:/opt/couchdb/etc/local.d/10-livesync.ini
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:5984/_up"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+
+  # Internal-only; Caddy publishes obsidian-app.${APPS_DOMAIN} → obsidian-app:3000. The Obsidian
+  # desktop app running in a browser via KasmVNC: a second, complementary client of the CouchDB
+  # above (install the Self-hosted LiveSync plugin inside it and point it at obsidian.${APPS_DOMAIN}).
+  # Its own KasmVNC basic auth for now; a forward-auth candidate later.
+  obsidian-app:
+    container_name: obsidian-app
+    image: lscr.io/linuxserver/obsidian:1.12.7
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    shm_size: "1gb"   # Chromium/KasmVNC needs shared memory
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TZ}
+      - CUSTOM_USER=${OBSIDIAN_APP_USER}
+      - PASSWORD=${OBSIDIAN_APP_PASSWORD}
+    volumes:
+      - ${APPDATA}/obsidian-app/config:/config
+
+  authentik-worker:
+    container_name: authentik-worker
+    image: ghcr.io/goauthentik/server:2026.5.3
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    command: worker
+    environment:
+      - AUTHENTIK_SECRET_KEY=${AUTHENTIK_SECRET_KEY}
+      - AUTHENTIK_ERROR_REPORTING__ENABLED=false
+      - AUTHENTIK_POSTGRESQL__HOST=authentik-postgresql
+      - AUTHENTIK_POSTGRESQL__USER=authentik
+      - AUTHENTIK_POSTGRESQL__NAME=authentik
+      - AUTHENTIK_POSTGRESQL__PASSWORD=${AUTHENTIK_PG_PASS}
+      - AUTHENTIK_REDIS__HOST=authentik-redis
+      - APPS_DOMAIN=${APPS_DOMAIN}
+      - GF_OAUTH_CLIENT_ID=${GF_OAUTH_CLIENT_ID}
+      - GF_OAUTH_CLIENT_SECRET=${GF_OAUTH_CLIENT_SECRET}
+      - GITEA_OAUTH_CLIENT_ID=${GITEA_OAUTH_CLIENT_ID}
+      - GITEA_OAUTH_CLIENT_SECRET=${GITEA_OAUTH_CLIENT_SECRET}
+      - PVE_OAUTH_CLIENT_ID=${PVE_OAUTH_CLIENT_ID}
+      - PVE_OAUTH_CLIENT_SECRET=${PVE_OAUTH_CLIENT_SECRET}
+      - PVE1_URL=${PVE1_URL}
+      - PVE2_URL=${PVE2_URL}
+    volumes:
+      - ${APPDATA}/authentik/media:/media
+      - ./authentik/blueprints:/blueprints/custom:ro
+    healthcheck:
+      test: ["CMD", "ak", "healthcheck"]
+      interval: 30s
+      timeout: 30s
+      retries: 5
+      start_period: 60s
+    depends_on:
+      authentik-postgresql:
+        condition: service_healthy
+      authentik-redis:
+        condition: service_healthy
+
+  # Read-only Docker API gateway for Homepage. Instead of mounting the raw /var/run/docker.sock
+  # into the dashboard (root-equivalent), expose only CONTAINERS + INFO over TCP; everything else
+  # (POST/exec/images/volumes/...) stays denied. Internal-only, no published ports.
+  socket-proxy:
+    container_name: socket-proxy
+    image: ghcr.io/tecnativa/docker-socket-proxy:v0.4.2
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    environment:
+      - CONTAINERS=1   # list containers (Homepage status tiles)
+      - INFO=1         # host info widget
+      - POST=0         # deny all writes (default, set explicitly)
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+  # Single-pane-of-glass dashboard. Config-as-code: ./homepage is committed + mounted read-only.
+  # Internal-only; Caddy publishes homepage.${APPS_DOMAIN} → homepage:3000. Live container status
+  # comes from socket-proxy (above), never the raw socket.
+  homepage:
+    container_name: homepage
+    image: ghcr.io/gethomepage/homepage:v1.13.2
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      # Homepage >=1.0 rejects requests whose Host header isn't allow-listed (it sits behind Caddy).
+      - HOMEPAGE_ALLOWED_HOSTS=homepage.${APPS_DOMAIN}
+      # Non-secret host/URL values referenced by the committed YAML (kept host-agnostic in git).
+      - HOMEPAGE_VAR_DOMAIN=${APPS_DOMAIN}
+      - HOMEPAGE_VAR_PVE1_URL=${HOMEPAGE_VAR_PVE1_URL}
+      - HOMEPAGE_VAR_PVE2_URL=${HOMEPAGE_VAR_PVE2_URL}
+      - HOMEPAGE_VAR_PIHOLE1_URL=${HOMEPAGE_VAR_PIHOLE1_URL}
+      - HOMEPAGE_VAR_PIHOLE2_URL=${HOMEPAGE_VAR_PIHOLE2_URL}
+      - HOMEPAGE_VAR_JELLYFIN_URL=${HOMEPAGE_VAR_JELLYFIN_URL}
+      - HOMEPAGE_VAR_MEDIA_HOST=${HOMEPAGE_VAR_MEDIA_HOST}
+      # Optional widget tokens, blank in .env keeps the matching (commented) widget disabled.
+      - HOMEPAGE_VAR_PROXMOX_USERNAME=${HOMEPAGE_VAR_PROXMOX_USERNAME}
+      - HOMEPAGE_VAR_PROXMOX_SECRET=${HOMEPAGE_VAR_PROXMOX_SECRET}
+      - HOMEPAGE_VAR_GRAFANA_PASSWORD=${HOMEPAGE_VAR_GRAFANA_PASSWORD}
+      - HOMEPAGE_VAR_GITEA_TOKEN=${HOMEPAGE_VAR_GITEA_TOKEN}
+      - HOMEPAGE_VAR_JELLYFIN_KEY=${HOMEPAGE_VAR_JELLYFIN_KEY}
+    volumes:
+      # Not :ro, Homepage copies skeleton config files (kubernetes.yaml, custom.css/js)
+      # into /app/config on boot, so a read-only mount makes it crash-loop on EROFS.
+      - ./homepage:/app/config
+      - ${APPDATA}/homepage/logs:/app/config/logs
+      # Wallpaper/static images must be served from Next.js' public root (/app/public/images),
+      # not /app/config. Referenced as /images/... in settings.yaml.
+      - ./homepage/images:/app/public/images
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    depends_on:
+      - socket-proxy
+
+networks:
+  default:
+    name: apps

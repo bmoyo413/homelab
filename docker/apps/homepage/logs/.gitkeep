@@ -1,0 +1,3 @@
+# Keeps the logs/ mountpoint present in git so the read-only /app/config bind
+# (docker-compose) has a target for the ${APPDATA}/homepage/logs mount. Log
+# files themselves are gitignored.

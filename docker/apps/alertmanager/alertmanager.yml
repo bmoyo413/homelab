@@ -1,0 +1,20 @@
+# Alertmanager, groups/dedupes alerts and forwards them to ntfy via the
+# ntfy-alertmanager bridge (which formats them nicely + adds action buttons).
+route:
+  receiver: ntfy
+  group_by: [alertname, instance]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+
+receivers:
+  - name: ntfy
+    webhook_configs:
+      - url: http://ntfy-alertmanager:8080
+        send_resolved: true
+
+inhibit_rules:
+  # A critical alert silences a warning for the same alert/instance.
+  - source_matchers: [severity = "critical"]
+    target_matchers: [severity = "warning"]
+    equal: [alertname, instance]

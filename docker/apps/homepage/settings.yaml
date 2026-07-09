@@ -1,0 +1,44 @@
+# Homepage, global settings. Config-as-code: this whole dir is committed and mounted
+# read-only at /app/config. Host-specific values (the domain, host IPs) and any secrets
+# come from the environment as {{HOMEPAGE_VAR_*}} (set in ../.env), never hard-coded here.
+# Docs: https://gethomepage.dev/configs/settings/
+
+title: Homelab
+description: Single pane of glass for the homelab
+
+# Order the groups and lay them out. Groups are defined by `services.yaml`.
+layout:
+  Infrastructure:
+    style: row
+    columns: 4
+  Apps:
+    style: row
+    columns: 4
+  Monitoring:
+    style: row
+    columns: 4
+  Media:
+    style: row
+    columns: 4
+  Space:
+    style: row
+    columns: 3
+
+# Background wallpaper (host-local file under homepage/images/, gitignored). Dimmed +
+# slightly blurred so the cards stay legible. cardBlur frosts the tiles over it.
+background:
+  image: /images/background.jpg
+  blur: sm
+  brightness: 65
+  saturate: 110
+cardBlur: sm
+
+headerStyle: clean
+theme: dark
+color: slate
+
+# Show the real status pill (up/down) computed from each service's siteMonitor/ping.
+statusStyle: dot
+
+# Pull service icons from the bundled Material Design / dashboard-icons set by name.
+hideVersion: true

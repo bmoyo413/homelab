@@ -1,0 +1,29 @@
+# ntfy-alertmanager bridge. Receives Alertmanager webhooks on :8080
+# and publishes formatted messages to ntfy. Topic uses the internal service name,
+# so no domain is hardcoded here.
+http-address :8080
+alert-mode single
+
+# Map alert severity -> ntfy priority + tag (emoji shortcode).
+labels {
+	order "severity"
+	severity "critical" {
+		priority 5
+		tags "rotating_light"
+	}
+	severity "warning" {
+		priority 4
+		tags "warning"
+	}
+}
+
+ntfy {
+	topic http://ntfy:80/homelab-alerts
+	# If you enable ntfy auth (NTFY_AUTH_DEFAULT_ACCESS=deny-all), add a token/user:
+	# token tk_xxx
+	# (or)  user <name>  /  password <pass>
+}
+
+# Optional: set base-url to this bridge's external URL to enable the "Silence"
+# action button (links back here). Left unset to avoid hardcoding the domain.
+# base-url https://alerts.<your-domain>

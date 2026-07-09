@@ -1,0 +1,17 @@
+# Homepage, header info widgets (the strip across the top).
+# Kept credential-free and dependency-free for the first cut. Docs:
+# https://gethomepage.dev/configs/info-widgets/
+---
+- greeting:
+    text_size: xl
+    text: Homelab
+
+- datetime:
+    text_size: l
+    format:
+      timeStyle: short
+      dateStyle: short
+
+- search:
+    provider: duckduckgo
+    target: _blank

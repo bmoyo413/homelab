@@ -1,0 +1,10 @@
+# Homepage, bookmarks (static quick links). Docs:
+# https://gethomepage.dev/configs/bookmarks/
+---
+- Repo:
+    - GitHub:
+        - abbr: GH
+          href: https://github.com/bmoyo413/homelab
+    - Gitea (self-hosted):
+        - abbr: GT
+          href: "https://gitea.{{HOMEPAGE_VAR_DOMAIN}}"

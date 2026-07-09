@@ -1,0 +1,209 @@
+# Homepage, service tiles. Grouped to match settings.yaml `layout`.
+---
+- Infrastructure:
+    - Proxmox joker (pve-01):
+        icon: proxmox.png
+        href: "{{HOMEPAGE_VAR_PVE1_URL}}"
+        siteMonitor: "{{HOMEPAGE_VAR_PVE1_URL}}"
+        description: Compute + tank (media) ZFS
+        # widget:
+        #   type: proxmox
+        #   url: "{{HOMEPAGE_VAR_PVE1_URL}}"
+        #   username: "{{HOMEPAGE_VAR_PROXMOX_USERNAME}}"   # e.g. monitoring@pve!prometheus
+        #   password: "{{HOMEPAGE_VAR_PROXMOX_SECRET}}"     # the token's secret value
+
+    - Proxmox pantheon (pve-02):
+        icon: proxmox.png
+        href: "{{HOMEPAGE_VAR_PVE2_URL}}"
+        siteMonitor: "{{HOMEPAGE_VAR_PVE2_URL}}"
+        description: Compute + dagger/shield ZFS
+        # widget:
+        #   type: proxmox
+        #   url: "{{HOMEPAGE_VAR_PVE2_URL}}"
+        #   username: "{{HOMEPAGE_VAR_PROXMOX_USERNAME}}"
+        #   password: "{{HOMEPAGE_VAR_PROXMOX_SECRET}}"
+
+    - Pi-hole primary:
+        icon: pi-hole.png
+        href: "{{HOMEPAGE_VAR_PIHOLE1_URL}}"
+        siteMonitor: "{{HOMEPAGE_VAR_PIHOLE1_URL}}"
+        description: Primary DNS (joker)
+
+    - Pi-hole secondary:
+        icon: pi-hole.png
+        href: "{{HOMEPAGE_VAR_PIHOLE2_URL}}"
+        siteMonitor: "{{HOMEPAGE_VAR_PIHOLE2_URL}}"
+        description: Secondary DNS (pantheon)
+
+- Apps:
+    - Gitea:
+        icon: gitea.png
+        href: "https://gitea.{{HOMEPAGE_VAR_DOMAIN}}"
+        siteMonitor: "https://gitea.{{HOMEPAGE_VAR_DOMAIN}}"
+        description: Git hosting + CI mirror
+        # widget:
+        #   type: gitea
+        #   url: "https://gitea.{{HOMEPAGE_VAR_DOMAIN}}"
+        #   key: "{{HOMEPAGE_VAR_GITEA_TOKEN}}"
+
+    - Vaultwarden:
+        icon: vaultwarden.png
+        href: "https://vault.{{HOMEPAGE_VAR_DOMAIN}}"
+        siteMonitor: "https://vault.{{HOMEPAGE_VAR_DOMAIN}}"
+        description: Password manager
+
+    - Authentik:
+        icon: authentik.png
+        href: "https://auth.{{HOMEPAGE_VAR_DOMAIN}}"
+        siteMonitor: "https://auth.{{HOMEPAGE_VAR_DOMAIN}}"
+        description: SSO / identity provider
+
+    - Obsidian sync:
+        icon: obsidian.png
+        href: "https://obsidian.{{HOMEPAGE_VAR_DOMAIN}}"
+        siteMonitor: "https://obsidian.{{HOMEPAGE_VAR_DOMAIN}}"
+        description: CouchDB LiveSync backend
+
+- Monitoring:
+    - Grafana:
+        icon: grafana.png
+        href: "https://grafana.{{HOMEPAGE_VAR_DOMAIN}}"
+        siteMonitor: "https://grafana.{{HOMEPAGE_VAR_DOMAIN}}"
+        description: Dashboards
+        # widget:
+        #   type: grafana
+        #   url: "https://grafana.{{HOMEPAGE_VAR_DOMAIN}}"
+        #   username: admin
+        #   password: "{{HOMEPAGE_VAR_GRAFANA_PASSWORD}}"
+
+    - Prometheus:
+        icon: prometheus.png
+        href: "https://prometheus.{{HOMEPAGE_VAR_DOMAIN}}"
+        siteMonitor: "https://prometheus.{{HOMEPAGE_VAR_DOMAIN}}"
+        description: Metrics + alert rules
+        # widget:
+        #   type: prometheus
+        #   url: "https://prometheus.{{HOMEPAGE_VAR_DOMAIN}}"
+
+    - Alertmanager:
+        icon: alertmanager.png
+        href: "https://alertmanager.{{HOMEPAGE_VAR_DOMAIN}}"
+        siteMonitor: "https://alertmanager.{{HOMEPAGE_VAR_DOMAIN}}"
+        description: Alert routing
+        # widget:
+        #   type: alertmanager
+        #   url: "https://alertmanager.{{HOMEPAGE_VAR_DOMAIN}}"
+
+    - ntfy:
+        icon: ntfy.png
+        href: "https://ntfy.{{HOMEPAGE_VAR_DOMAIN}}"
+        siteMonitor: "https://ntfy.{{HOMEPAGE_VAR_DOMAIN}}"
+        description: Push notifications
+
+- Media:
+    - Jellyfin:
+        icon: jellyfin.png
+        href: "{{HOMEPAGE_VAR_JELLYFIN_URL}}"
+        siteMonitor: "{{HOMEPAGE_VAR_JELLYFIN_URL}}"
+        description: Media server (pantheon)
+        # widget:
+        #   type: jellyfin
+        #   url: "{{HOMEPAGE_VAR_JELLYFIN_URL}}"
+        #   key: "{{HOMEPAGE_VAR_JELLYFIN_KEY}}"
+
+    # arr stack + downloader on the media VM (medsev). Host IP comes from
+    # HOMEPAGE_VAR_MEDIA_HOST in ../.env
+    - Sonarr:
+        icon: sonarr.png
+        href: "http://{{HOMEPAGE_VAR_MEDIA_HOST}}:8989"
+        siteMonitor: "http://{{HOMEPAGE_VAR_MEDIA_HOST}}:8989"
+        description: TV (medsev)
+
+    - Radarr:
+        icon: radarr.png
+        href: "http://{{HOMEPAGE_VAR_MEDIA_HOST}}:7878"
+        siteMonitor: "http://{{HOMEPAGE_VAR_MEDIA_HOST}}:7878"
+        description: Movies (medsev)
+
+    - Prowlarr:
+        icon: prowlarr.png
+        href: "http://{{HOMEPAGE_VAR_MEDIA_HOST}}:9696"
+        siteMonitor: "http://{{HOMEPAGE_VAR_MEDIA_HOST}}:9696"
+        description: Indexers (medsev)
+
+    - qBittorrent:
+        icon: qbittorrent.png
+        href: "http://{{HOMEPAGE_VAR_MEDIA_HOST}}:8080"
+        siteMonitor: "http://{{HOMEPAGE_VAR_MEDIA_HOST}}:8080"
+        description: Downloader (medsev)
+
+    - Profilarr:
+        icon: mdi-tune-variant
+        href: "http://{{HOMEPAGE_VAR_MEDIA_HOST}}:6868"
+        siteMonitor: "http://{{HOMEPAGE_VAR_MEDIA_HOST}}:6868"
+        description: Quality profiles (medsev)
+
+    - Audiobookshelf:
+        icon: audiobookshelf.png
+        href: "http://{{HOMEPAGE_VAR_MEDIA_HOST}}:13378"
+        siteMonitor: "http://{{HOMEPAGE_VAR_MEDIA_HOST}}:13378"
+        description: Audiobooks + podcasts (medsev)
+
+# Fun, credential-free live tiles via the customapi widget (public space APIs, no keys).
+- Space:
+    - ISS Live Tracker:
+        icon: mdi-space-station
+        href: https://wheretheiss.at/
+        description: International Space Station, live
+        widget:
+          type: customapi
+          url: https://api.wheretheiss.at/v1/satellites/25544
+          refreshInterval: 5000
+          method: GET
+          mappings:
+            - field: altitude
+              label: Alt (km)
+              format: number
+            - field: velocity
+              label: Speed km/h
+              format: number
+            - field: latitude
+              label: Lat
+              format: float
+            - field: longitude
+              label: Lon
+              format: float
+    - People in Space:
+        icon: mdi-account-group
+        href: https://corquaid.github.io/international-space-station-APIs/
+        description: Humans off-planet right now
+        widget:
+          type: customapi
+          url: https://corquaid.github.io/international-space-station-APIs/JSON/people-in-space.json
+          refreshInterval: 3600000
+          method: GET
+          mappings:
+            - field: number
+              label: In Space
+              format: number
+            - field: iss_expedition
+              label: ISS Exp.
+              format: number
+    # DEMO_KEY is NASA's public shared key (rate-limited ~50/day). Swap for a free
+    # key from https://api.nasa.gov if it 429s. Drop this tile if you don't want it.
+    - Astronomy Pic of the Day:
+        icon: mdi-telescope
+        href: https://apod.nasa.gov/apod/
+        description: NASA APOD
+        widget:
+          type: customapi
+          url: https://api.nasa.gov/planetary/apod?api_key=DEMO_KEY
+          refreshInterval: 3600000
+          method: GET
+          mappings:
+            - field: title
+              label: Today
+              format: text
+            - field: date
+              label: Date
+              format: date

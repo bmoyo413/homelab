@@ -1,0 +1,84 @@
+# Alert rules: availability, host, and TLS cert health. Expand over time.
+# Cert expiry comes from blackbox-exporter (probes each routed HTTPS endpoint).
+groups:
+  - name: availability
+    rules:
+      - alert: TargetDown
+        expr: up == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Scrape target down: {{ $labels.job }} ({{ $labels.instance }})"
+          description: "Prometheus has not been able to scrape {{ $labels.instance }} for 5 minutes."
+
+      - alert: PrometheusConfigReloadFailed
+        expr: prometheus_config_last_reload_successful == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Prometheus config reload failed"
+          description: "The last Prometheus configuration reload was not successful."
+
+  - name: host
+    rules:
+      - alert: HostHighDiskUsage
+        expr: |
+          (1 - (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"}
+                / node_filesystem_size_bytes{fstype!~"tmpfs|overlay"})) > 0.85
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Disk >85% full on {{ $labels.instance }} ({{ $labels.mountpoint }})"
+          description: "Filesystem {{ $labels.mountpoint }} on {{ $labels.instance }} is over 85% full."
+
+      - alert: HostHighMemory
+        expr: |
+          (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) > 0.90
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Memory >90% used on {{ $labels.instance }}"
+          description: "Available memory on {{ $labels.instance }} has been below 10% for 10 minutes."
+
+      - alert: HostHighCpu
+        expr: |
+          (1 - avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m]))) > 0.90
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "CPU >90% on {{ $labels.instance }}"
+          description: "CPU usage on {{ $labels.instance }} has been above 90% for 15 minutes."
+
+  - name: certs
+    rules:
+      - alert: CertExpiringSoon
+        expr: (probe_ssl_earliest_cert_expiry - time()) < 14 * 24 * 3600
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "TLS cert for {{ $labels.instance }} expires in <14d"
+          description: "Cert expires in {{ $value | humanizeDuration }}. LE renewal via Caddy/DNS-01 should be automatic, investigate the CF token or Caddy logs."
+
+      - alert: CertExpiringCritical
+        expr: (probe_ssl_earliest_cert_expiry - time()) < 3 * 24 * 3600
+        for: 1h
+        labels:
+          severity: critical
+        annotations:
+          summary: "TLS cert for {{ $labels.instance }} expires in <3d"
+          description: "Cert expires in {{ $value | humanizeDuration }}. Renewal has not happened, act now."
+
+      - alert: BlackboxProbeFailed
+        expr: probe_success == 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "HTTPS probe failing: {{ $labels.instance }}"
+          description: "blackbox could not complete a verified HTTPS probe of {{ $labels.instance }} for 10m (cert error, Caddy down, or endpoint unreachable)."
