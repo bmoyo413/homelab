@@ -1,0 +1,12 @@
+# Secrets and environment-specific config, never commit these
+.env
+*.env
+!*.env.example
+
+# WireGuard / VPN configs (keep out of git if ever copied here)
+wg*.conf
+
+# Editor and OS noise
+.DS_Store
+*.swp
+
