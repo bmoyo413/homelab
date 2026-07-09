@@ -1,0 +1,5 @@
+# Local DNS wildcard for the apps domain (split-horizon).
+# Copy to /etc/dnsmasq.d/local-dns.conf on EACH Pi-hole, then `service pihole-FTL restart`.
+# Nebula Sync does NOT replicate /etc/dnsmasq.d/ files, so apply this on both instances.
+# Resolves *.<your-domain> to the internal Caddy / apps-VM IP (keeps traffic on the LAN/tailnet).
+address=/example.lab/192.168.1.81
