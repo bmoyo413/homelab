@@ -1,0 +1,19 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "schedule": ["before 6am on monday"],
+  "labels": ["dependencies"],
+  "packageRules": [
+    {
+      "description": "Pin every Docker image to its digest so deploys are reproducible, and bundle the bumps into one weekly PR.",
+      "matchDatasources": ["docker"],
+      "pinDigests": true,
+      "groupName": "docker image updates"
+    },
+    {
+      "description": "Skip locally-built images, there is no registry to check.",
+      "matchPackageNames": ["/^homelab\\//"],
+      "enabled": false
+    }
+  ]
+}
