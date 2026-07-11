@@ -114,12 +114,14 @@ audiobookshelf.{$APPS_DOMAIN} {
 }
 
 # --- Proxmox nodes (cross-host: the hypervisors themselves) ---
-# Reuse {$PVE1_URL}/{$PVE2_URL} (the node web-UI origins already set in .env for SSO). Proxmox
-# serves a self-signed cert on :8006, so skip upstream verification; Caddy still issues a real
-# LE cert on the outside. HEAD returns 501 (pveproxy quirk); GET is 200.
+# Reuse {$PVE1_BACKEND_URL}/{$PVE2_BACKEND_URL} (the direct node web-UI origins set in .env).
+# Not {$PVE1_URL}/{$PVE2_URL} from the SSO block, that's the public OIDC hostname and would
+# make this block proxy to itself. Proxmox serves a self-signed cert on :8006, so skip
+# upstream verification; Caddy still issues a real LE cert on the outside. HEAD returns 501
+# (pveproxy quirk); GET is 200.
 joker.{$APPS_DOMAIN} {
 	import cf_tls
-	reverse_proxy {$PVE1_URL} {
+	reverse_proxy {$PVE1_BACKEND_URL} {
 		transport http {
 			tls_insecure_skip_verify
 		}
@@ -128,7 +130,7 @@ joker.{$APPS_DOMAIN} {
 
 pantheon.{$APPS_DOMAIN} {
 	import cf_tls
-	reverse_proxy {$PVE2_URL} {
+	reverse_proxy {$PVE2_BACKEND_URL} {
 		transport http {
 			tls_insecure_skip_verify
 		}

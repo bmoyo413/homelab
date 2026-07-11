@@ -1,11 +1,11 @@
 # 🏠 Homelab
 
-![GitHub last commit](https://img.shields.io/github/last-commit/bmoyo413/homelabL)
+![GitHub last commit](https://img.shields.io/github/last-commit/bmoyo413/homelab)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 My self-hosted homelab: two Proxmox VE hosts, ZFS storage, and a declarative Docker
 stack that all lives in git. The idea is **reproducible infrastructure**, everything
-is described as code (Compose, Ansible, CI) instead of hand-built and forgotten.
+is described as code (Compose, CI, more to come) instead of hand-built and forgotten.
 
 > **Status:** the media and apps stacks are up and running, apps behind real Let's
 > Encrypt certs (Cloudflare DNS-01) with Prometheus/Grafana/Loki monitoring across
@@ -72,11 +72,37 @@ Setup, the VPN kill-switch, and the TRaSH hardlink layout are documented in
 
 ---
 
+## 🐳 Docker apps stack
+
+A single declarative Compose stack ([`docker/apps/docker-compose.yml`](docker/apps/docker-compose.yml))
+running in a dedicated apps VM on `pantheon`, appdata on the `dagger` SSD pool. Same conventions
+as the media stack: image-pinned, `no-new-privileges`, healthchecks. Only Caddy publishes ports;
+every other service is internal-only and reached by container name.
+
+| Service | Image | Purpose |
+|---------|-------|---------|
+| Caddy | custom (Caddy + Cloudflare DNS plugin) | Reverse proxy; real Let's Encrypt certs via DNS-01 |
+| Authentik | goauthentik | Single sign-on (OIDC) for Grafana, Gitea, and the Proxmox hosts |
+| Prometheus / Alertmanager / Grafana | prom / grafana | Metrics, dashboards, and alerting routed to ntfy |
+| Loki / Alloy | grafana | Log aggregation and shipping |
+| node-exporter / cAdvisor / pve-exporter / blackbox-exporter | prom | Host, container, Proxmox, and TLS/cert probes |
+| Gitea | gitea | Self-hosted git, SQLite backend |
+| Vaultwarden | dani-garcia | Password manager, Bitwarden-compatible |
+| CouchDB | apache | Obsidian LiveSync backend |
+| Obsidian webtop | linuxserver | Browser-accessible Obsidian desktop (KasmVNC) |
+| Homepage | gethomepage | Dashboard for the whole lab, config-as-code |
+| ntfy | binwiederhier | Push notifications for alerts and backups |
+
+Setup, SSO, and monitoring are documented in
+[`docker/apps/README.md`](docker/apps/README.md). Secrets live in a gitignored
+`docker/apps/.env` (template: `docker/apps/.env.example`); nothing sensitive is committed.
+
+---
+
 ## 🗂️ Repo structure
 ```
 homelab/
 ├── DNS/            # Pi-hole + Unbound build guide
-├── ansible/        # Inventory + maintenance playbooks
 ├── docker/
 │   ├── media/      # Declarative media stack (arr + qBittorrent/VPN)
 │   └── apps/       # Apps stack (Caddy, monitoring, Gitea, Vaultwarden, ntfy, Authentik, CouchDB)
@@ -94,8 +120,9 @@ actively working toward, roughly in order:
       routine updates across the nodes are as-code, not by hand.
 - [ ] **Provisioning as-code (Terraform):** define the Proxmox VMs and LXCs declaratively
       instead of clicking through helper scripts, so a node can be rebuilt from config.
-- [ ] **Backups, for real:** deploy scheduled restic backups, then document the
-      restore path (I only publish infra once I've actually run it).
+- [ ] **Backups into the repo:** restic is already running nightly (off-host to a
+      separate LXC on `pantheon`, restore path tested, not just assumed), just
+      hasn't been checked into this repo yet. Still not off-site either way.
 - [ ] **Tailscale mesh, as-code:** manage remote access to the lab as a defined overlay
       network instead of hand-rolled port-forwards.
 - [ ] **Runbooks:** per-service setup + recovery notes, added as each piece stabilizes.

@@ -24,11 +24,12 @@ services:
       - APPS_DOMAIN=${APPS_DOMAIN}
       - CF_API_TOKEN=${CF_API_TOKEN}
       - ACME_EMAIL=${ACME_EMAIL}
-      # Cross-host reverse-proxy targets (media VM + Proxmox nodes). PVE*_URL are reused
-      # from the SSO block below; MEDIA_HOST is the media VM IP.
+      # Cross-host reverse-proxy targets (media VM + Proxmox nodes). PVE*_BACKEND_URL is the
+      # direct node address Caddy proxies to, not the PVE1_URL/PVE2_URL in the SSO block
+      # below (that's the public OIDC hostname). MEDIA_HOST is the media VM IP.
       - MEDIA_HOST=${MEDIA_HOST}
-      - PVE1_URL=${PVE1_URL}
-      - PVE2_URL=${PVE2_URL}
+      - PVE1_BACKEND_URL=${PVE1_BACKEND_URL}
+      - PVE2_BACKEND_URL=${PVE2_BACKEND_URL}
     volumes:
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - ${APPDATA}/caddy/data:/data
