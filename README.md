@@ -91,7 +91,7 @@ every other service is internal-only and reached by container name.
 | CouchDB | apache | Obsidian LiveSync backend |
 | Obsidian webtop | linuxserver | Browser-accessible Obsidian desktop (KasmVNC) |
 | Homepage | gethomepage | Dashboard for the whole lab, config-as-code |
-| ntfy | binwiederhier | Push notifications for alerts and backups |
+| ntfy | binwiederhier | Push notifications for alerts |
 
 Setup, SSO, and monitoring are documented in
 [`docker/apps/README.md`](docker/apps/README.md). Secrets live in a gitignored
@@ -120,9 +120,7 @@ actively working toward, roughly in order:
       routine updates across the nodes are as-code, not by hand.
 - [ ] **Provisioning as-code (Terraform):** define the Proxmox VMs and LXCs declaratively
       instead of clicking through helper scripts, so a node can be rebuilt from config.
-- [ ] **Backups into the repo:** restic is already running nightly (off-host to a
-      separate LXC on `pantheon`, restore path tested, not just assumed), just
-      hasn't been checked into this repo yet. Still not off-site either way.
+- [ ] **Backups:** planned, off-host to start, off-site down the line.
 - [ ] **Tailscale mesh, as-code:** manage remote access to the lab as a defined overlay
       network instead of hand-rolled port-forwards.
 - [ ] **Runbooks:** per-service setup + recovery notes, added as each piece stabilizes.
