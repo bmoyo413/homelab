@@ -49,9 +49,10 @@ Two Proxmox VE nodes, named **`joker`** (`pve-01`) and **`pantheon`** (`pve-02`)
 ## 🐳 Docker media stack
 
 A single declarative Compose stack ([`docker/media/docker-compose.yml`](docker/media/docker-compose.yml))
-running in the `medsev` VM on `joker`. All services are image-pinned, run with
-`no-new-privileges`, and carry restart policies; the download/arr core has healthchecks
-and startup ordering.
+running in the `medsev` VM on `joker`. Images are pinned to explicit versions, except the
+hotio arr images, which track `:release` because upstream prunes old versioned tags. All
+services run with `no-new-privileges` and carry restart policies; the download/arr core has
+healthchecks and startup ordering.
 
 | Service | Image | Purpose |
 |---------|-------|---------|

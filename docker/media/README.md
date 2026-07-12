@@ -2,8 +2,9 @@
 
 The arr/download stack, in a single dedicated VM (**`medsev`**) on **`joker` (pve-01)**,
 defined in one [`docker-compose.yml`](docker-compose.yml). Same conventions as the other
-stacks: every image pinned, `no-new-privileges`, restart policies, healthchecks on the
-core, and secrets in a gitignored `.env`.
+stacks: images pinned to explicit versions (the hotio arr images track `:release`, which
+upstream prunes old versioned tags), `no-new-privileges`, restart policies, healthchecks on
+the core, and secrets in a gitignored `.env`.
 
 ## Services
 

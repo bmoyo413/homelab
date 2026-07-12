@@ -54,7 +54,7 @@ services:
     security_opt:
       - no-new-privileges:true
     restart: unless-stopped
-    image: ghcr.io/hotio/radarr:release 
+    image: ghcr.io/hotio/radarr:release # hotio prunes old versioned tags, so a version pin would downgrade and break the DB; re-pin by digest later
     ports:
       - 7878:7878
     environment:
@@ -82,7 +82,7 @@ services:
     security_opt:
       - no-new-privileges:true
     restart: unless-stopped
-    image: ghcr.io/hotio/sonarr:release 
+    image: ghcr.io/hotio/sonarr:release # hotio prunes old versioned tags, so a version pin would downgrade and break the DB; re-pin by digest later
     ports:
       - 8989:8989
     environment:
@@ -110,7 +110,7 @@ services:
     security_opt:
       - no-new-privileges:true
     restart: unless-stopped
-    image: ghcr.io/hotio/prowlarr:release 
+    image: ghcr.io/hotio/prowlarr:release # hotio prunes old versioned tags, so a version pin would downgrade and break the DB; re-pin by digest later
     ports:
       - 9696:9696
     environment:
@@ -148,7 +148,7 @@ services:
 
   profilarr:
     container_name: profilarr
-    image: santiagosayshey/profilarr:v1.1.4 
+    image: santiagosayshey/profilarr:v1.1.4
     security_opt:
       - no-new-privileges:true
     restart: unless-stopped
@@ -182,7 +182,7 @@ services:
       qbittorrent:
         condition: service_started
 
-  audiobookshelf: 
+  audiobookshelf:
     container_name: audiobookshelf
     hostname: audiobookshelf.internal
     security_opt:
