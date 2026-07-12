@@ -438,8 +438,8 @@ services:
     restart: unless-stopped
     shm_size: "1gb"   # Chromium/KasmVNC needs shared memory
     environment:
-      - PUID=1000
-      - PGID=1000
+      - PUID=${PUID}
+      - PGID=${PGID}
       - TZ=${TZ}
       - CUSTOM_USER=${OBSIDIAN_APP_USER}
       - PASSWORD=${OBSIDIAN_APP_PASSWORD}
