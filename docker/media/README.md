@@ -50,8 +50,7 @@ docker compose logs -f qbittorrent  # follow one service
 
 qBittorrent routes all traffic through **ProtonVPN via WireGuard** using hotio's built-in
 VPN support: you supply a WireGuard config from ProtonVPN (see
-[hotio's docs](https://hotio.dev/containers/qbittorrent/)). Companion containers
-(Mousehole) share qBittorrent's network namespace, so they egress through the tunnel too.
+[hotio's docs](https://hotio.dev/containers/qbittorrent/)).
 
 ## Data layout
 

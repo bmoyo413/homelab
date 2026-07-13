@@ -41,7 +41,6 @@ services:
       - net.ipv4.conf.all.src_valid_mark=1
       - net.ipv6.conf.all.disable_ipv6=1
     healthcheck:
-      # WebUI binds inside the container regardless of VPN state. hotio images ship curl.
       test: ["CMD", "curl", "-fsS", "http://localhost:8080"]
       interval: 30s
       timeout: 10s
@@ -54,7 +53,7 @@ services:
     security_opt:
       - no-new-privileges:true
     restart: unless-stopped
-    image: ghcr.io/hotio/radarr:release # hotio prunes old versioned tags, so a version pin would downgrade and break the DB; re-pin by digest later
+    image: ghcr.io/hotio/radarr:release # hotio prunes old versioned tags, so a version pin would downgrade and break the DB
     ports:
       - 7878:7878
     environment:
@@ -82,7 +81,7 @@ services:
     security_opt:
       - no-new-privileges:true
     restart: unless-stopped
-    image: ghcr.io/hotio/sonarr:release # hotio prunes old versioned tags, so a version pin would downgrade and break the DB; re-pin by digest later
+    image: ghcr.io/hotio/sonarr:release # hotio prunes old versioned tags, so a version pin would downgrade and break the DB
     ports:
       - 8989:8989
     environment:
@@ -110,7 +109,7 @@ services:
     security_opt:
       - no-new-privileges:true
     restart: unless-stopped
-    image: ghcr.io/hotio/prowlarr:release # hotio prunes old versioned tags, so a version pin would downgrade and break the DB; re-pin by digest later
+    image: ghcr.io/hotio/prowlarr:release # hotio prunes old versioned tags, so a version pin would downgrade and break the DB
     ports:
       - 9696:9696
     environment:
@@ -177,7 +176,7 @@ services:
       # so the LAN IP/hostname you browse to must be listed here. Set in .env.
       - MOUSEHOLE_ALLOWED_HOSTS=${MOUSEHOLE_ALLOWED_HOSTS}
     volumes:
-      - /docker/appdata/mousehole:/var/lib/mousehole   # v0.4.0 default state dir (was /srv/mousehole)
+      - /docker/appdata/mousehole:/var/lib/mousehole
     depends_on:
       qbittorrent:
         condition: service_started
