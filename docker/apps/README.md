@@ -56,16 +56,13 @@ read-only). Ships with **Node Exporter Full**; datasources are pinned by UID
 (`prometheus`/`loki`) so provisioned dashboards bind deterministically. Add more by
 dropping JSON in that folder.
 
-## Planned (later)
-- **Services:** immich, stirling-pdf, memos (if wanted).
-
 ## Exposure & TLS
 
-**Tailscale, no public ports.** Only Caddy maps `80`/`443`; everything else is
+**LAN-only, no public ports.** Only Caddy maps `80`/`443`; everything else is
 internal-only and reached through Caddy by container name. Caddy obtains **real
 Let's Encrypt certs via the Cloudflare DNS-01 challenge** (no inbound ports), so there
 are **no cert warnings**. Pair with **split-horizon DNS**: point `*.${APPS_DOMAIN}` at
-this host in Pi-hole so traffic stays on the LAN/tailnet. Routed subdomains:
+this host in Pi-hole so traffic stays on the LAN. Routed subdomains:
 `grafana.`, `prometheus.`, `alertmanager.`, `ntfy.`, `gitea.`, `vault.`, `auth.`, `obsidian.`,
 `obsidian-app.`, `homepage.${APPS_DOMAIN}`.
 
@@ -81,7 +78,8 @@ reproducible rather than clicked into a UI. Local admin logins stay as a break-g
 CouchDB is the backend for the **Obsidian Self-hosted LiveSync** plugin: real-time,
 end-to-end-encrypted note sync across desktop and mobile, served at
 `obsidian.${APPS_DOMAIN}` through Caddy. It uses CouchDB's own basic auth (not Authentik).
-Because the lab is Tailscale-only, syncing from an iPhone needs the Tailscale app running.
+On the LAN an iPhone syncs directly against CouchDB; off-network sync is a planned Tailscale
+overlay (see the roadmap in the top-level README), not live yet.
 A browser-accessible **Obsidian webtop** (`obsidian-app`, KasmVNC) runs the desktop app at
 `obsidian-app.${APPS_DOMAIN}` as a second LiveSync client of the same CouchDB.
 
@@ -97,21 +95,26 @@ Docker socket into the dashboard.
 
 ## Deploy
 
-Prerequisites (owner / one-time on the VM):
-1. A Docker VM on `pantheon` with a `dagger` dataset mounted at `${APPDATA}`.
-2. Per-service appdata dirs created + chowned (grafana → uid `472`, loki → uid `10001`,
-   gitea → `${PUID}`; vaultwarden runs as root).
-3. **Split-horizon DNS:** Pi-hole resolves `*.${APPS_DOMAIN}` → this VM's IP.
-4. **Cloudflare API token** (Zone → DNS → Edit on the zone) → `CF_API_TOKEN`; set `ACME_EMAIL`.
-5. A read-only Proxmox API token for pve-exporter.
-6. Edit the placeholder IPs in `prometheus/prometheus.yml`.
-7. Generate a Vaultwarden `ADMIN_TOKEN` → `.env` (`docker run --rm vaultwarden/server /vaultwarden hash`).
+One-time setup on the VM (Docker VM on `pantheon`, `dagger` mounted at `${APPDATA}`):
 
-After first start, create your Vaultwarden and Gitea accounts (open registration is
-disabled by default), then leave signups off.
+1. Create + chown the per-service appdata dirs (grafana `472`, loki `10001`, gitea `${PUID}`;
+   vaultwarden runs as root).
+2. Point Pi-hole `*.${APPS_DOMAIN}` at this VM (split-horizon DNS).
+3. Fill in `.env`: `CF_API_TOKEN` (Cloudflare Zone → DNS → Edit) + `ACME_EMAIL`, a read-only
+   Proxmox API token for pve-exporter, and a Vaultwarden `ADMIN_TOKEN`
+   (`docker run --rm vaultwarden/server /vaultwarden hash`).
+4. Set the real IPs in `prometheus/prometheus.yml` (Prometheus can't read `.env`).
+
+Then, from the repo root:
 
 ```bash
-cp .env.example .env                                          # then fill in secrets
-docker compose -f docker/apps/docker-compose.yml config       # parse-check (from repo root)
-docker compose -f docker/apps/docker-compose.yml up -d        # start in the background
+cp .env.example .env                                          # fill in secrets
+docker compose -f docker/apps/docker-compose.yml config       # parse-check
+docker compose -f docker/apps/docker-compose.yml up -d        # start
 ```
+
+On first start, create your Vaultwarden and Gitea accounts (open registration is disabled),
+then leave signups off.
+
+## Planned (later)
+- **Services:** immich, stirling-pdf, memos (if wanted).

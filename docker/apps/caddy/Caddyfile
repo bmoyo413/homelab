@@ -1,6 +1,6 @@
-# Reverse proxy for the apps stack. Reached over Tailscale; real Let's Encrypt certs
-# via Cloudflare DNS-01 (no inbound ports). Pair with split-horizon DNS: point
-# *.{$APPS_DOMAIN} at this host in Pi-hole so traffic stays on the LAN/tailnet.
+# Reverse proxy for the apps stack. LAN-only; real Let's Encrypt certs
+# via Cloudflare DNS-01 (no inbound ports). Pair with DNS: point
+# *.{$APPS_DOMAIN} at this host in Pi-hole so traffic stays on the LAN.
 # {$APPS_DOMAIN} / {$CF_API_TOKEN} / {$ACME_EMAIL} come from the container env.
 #
 # Add a service: copy a block and point reverse_proxy at its container name + port.
@@ -57,9 +57,6 @@ obsidian.{$APPS_DOMAIN} {
 	reverse_proxy couchdb:5984
 }
 
-# Obsidian desktop in the browser (KasmVNC). Caddy upgrades WebSockets transparently, so the
-# linuxserver "strict reverse proxies" caveat (an nginx issue) does not apply here. Use the
-# plain-HTTP port 3000; Caddy terminates TLS.
 obsidian-app.{$APPS_DOMAIN} {
 	import cf_tls
 	reverse_proxy obsidian-app:3000
@@ -71,7 +68,7 @@ homepage.{$APPS_DOMAIN} {
 }
 
 # --- Media stack (cross-host: runs on the media VM, not in this stack) ---
-# {$MEDIA_HOST} is the media VM's LAN/tailnet IP (set in .env, passed via compose env).
+# {$MEDIA_HOST} is the media VM's LAN IP (set in .env, passed via compose env).
 # These give the media web UIs the same <name>.{$APPS_DOMAIN} + real-cert treatment as the
 # apps stack, so nothing is reached by bare IP:port. No /api bypass is needed while these
 # are unauthenticated; add one only if Authentik forward-auth later fronts them.
@@ -95,7 +92,6 @@ prowlarr.{$APPS_DOMAIN} {
 	reverse_proxy {$MEDIA_HOST}:9696
 }
 
-# qBittorrent validates the Host header, so rewrite it to the upstream host:port.
 qbittorrent.{$APPS_DOMAIN} {
 	import cf_tls
 	reverse_proxy {$MEDIA_HOST}:8080 {
@@ -115,10 +111,8 @@ audiobookshelf.{$APPS_DOMAIN} {
 
 # --- Proxmox nodes (cross-host: the hypervisors themselves) ---
 # Reuse {$PVE1_BACKEND_URL}/{$PVE2_BACKEND_URL} (the direct node web-UI origins set in .env).
-# Not {$PVE1_URL}/{$PVE2_URL} from the SSO block, that's the public OIDC hostname and would
-# make this block proxy to itself. Proxmox serves a self-signed cert on :8006, so skip
-# upstream verification; Caddy still issues a real LE cert on the outside. HEAD returns 501
-# (pveproxy quirk); GET is 200.
+# Proxmox serves a self-signed cert on :8006, so skip upstream verification; Caddy still
+# issues a real LE cert on the outside.
 joker.{$APPS_DOMAIN} {
 	import cf_tls
 	reverse_proxy {$PVE1_BACKEND_URL} {
