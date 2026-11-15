@@ -3,6 +3,12 @@
 ![GitHub last commit](https://img.shields.io/github/last-commit/bmoyo413/homelab)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
+> [!IMPORTANT]
+> **Archived (November 2026).** This is the record of my first homelab build, and it is no
+> longer updated. That lab is being rebuilt from zero in a new repo that builds it from code
+> instead of describing it. Everything below describes the first build as it was. For the
+> current state, see [my profile](https://github.com/bmoyo413).
+
 My self-hosted homelab: two Proxmox VE hosts, ZFS storage, and a declarative Docker
 stack that all lives in git. The idea is **reproducible infrastructure**, everything
 is described as code (Compose, CI, more to come) instead of hand-built and forgotten.
