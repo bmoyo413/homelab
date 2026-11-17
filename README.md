@@ -13,10 +13,9 @@ My self-hosted homelab: two Proxmox VE hosts, ZFS storage, and a declarative Doc
 stack that all lives in git. The idea is **reproducible infrastructure**, everything
 is described as code (Compose, CI, more to come) instead of hand-built and forgotten.
 
-> **Status:** the media and apps stacks are up and running, apps behind real Let's
+> **Status at archive:** the media and apps stacks were running, apps behind real Let's
 > Encrypt certs (Cloudflare DNS-01) with Prometheus/Grafana/Loki monitoring across
-> both nodes and Authentik single sign-on. Still very much a work in progress, more
-> pieces get added and documented as I go.
+> both nodes and Authentik single sign-on.
 
 ---
 

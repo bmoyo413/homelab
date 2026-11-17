@@ -1,0 +1,4 @@
+# Count YAML in the language bar. GitHub skips it by default as a data language,
+# which left this Compose and CI repo labelled as CSS.
+*.yml linguist-detectable
+*.yaml linguist-detectable
